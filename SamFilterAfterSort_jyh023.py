@@ -43,6 +43,13 @@ def decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs):
 					if len(output_sorted) > 1: #Make sure length is greater than 1
 						if int(output_sorted[0][0]) != output_sorted[1][0]: #Asks the question if quality M values are the same for first 2 reads (sorted)
 							ToBePrinted += 1
+						else: #Make sure duplicate sam outputs are accounted for and pass pickTop filter
+							for i in range(1, len(output_sorted)): #Loop through all read IDs to ask if the chromosome start position is the same
+								if int(output_sorted[0][0]) - int(output_sorted[i][0]) == 0: #Only account if the read quality is the same
+									start_pos = [output_sorted[0][1].split()[3]] #Initialize first chromosome start position
+									start_pos.append(output_sorted[i][1].split()[3]) #Append other start positions with identical read quality
+							if len(set(start_pos)) <= 1: #Only pass if all the chromosome start positions are identical
+								ToBePrinted += 1
 					else: #If length is 1, this is basically unique option
 						ToBePrinted += 1
 			elif re.match(Same_method ,'duplicated'):
@@ -59,6 +66,13 @@ def decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs):
 					if len(output_sorted) > 1: #Make sure length is greater than 1
 						if int(output_sorted[0][0]) != output_sorted[1][0]: #Asks the question if quality M values are the same for first 2 reads (sorted)
 							ToBePrinted += 1
+						else: #Make sure duplicate sam outputs are accounted for and pass pickTop filter
+                                                        for i in range(1, len(output_sorted)): #Loop through all read IDs to ask if the chromosome start position is the same
+                                                                if int(output_sorted[0][0]) - int(output_sorted[i][0]) == 0: #Only account if the read quality is the same
+                                                                        start_pos = [output_sorted[0][1].split()[3]] #Initialize first chromosome start position
+                                                                        start_pos.append(output_sorted[i][1].split()[3]) #Append other start positions with identical read quality
+                                                        if len(set(start_pos)) <= 1: #Only pass if all the chromosome start positions are identical
+                                                                ToBePrinted += 1
 					else: #If length is 1, this is basically unique option
 						ToBePrinted += 1
 			elif re.match(Dif_method ,'duplicated'):
@@ -95,10 +109,10 @@ with open(args.outf,'w') as of:
 				full = line.split()
 				current_id.append(full[0])
 				newid = full[0]
-			#if newid < current_id[0]: #Check if the file is sorted
-			#	print "New Line: " + str(full[0]) + "\nOld Line: " + str(current_id[0])
-			#	print "File is not sorted\n"
-			#	sys.exit() #Only pass lines that are sorted
+#			if newid < current_id[0]: #Check if the file is sorted
+#				print "New Line: " + str(full[0]) + "\nOld Line: " + str(current_id[0])
+#				print "File is not sorted\n"
+#				sys.exit() #Only pass lines that are sorted
 			if newid != current_id[0]: #Change in ID leads to output of previous IDs sam lines
 				if len(output) >= 1: #Make sure output values are present as IDs with no passing reads can't be inputs to our function
 					(ToBePrinted) = decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs)
@@ -108,6 +122,7 @@ with open(args.outf,'w') as of:
 				current_id = [newid] #Reset all the variables for new ID
 				output = {}
 				mismatch = 0
+				dup_rm = [(full[2],full[3],full[5],full[15])] 
 			species = full[-1] #Store species for future check
 			if re.search(species, speciesTocheck): #Only filter lines for species of interest
 				quality = full[5]
@@ -127,5 +142,4 @@ with open(args.outf,'w') as of:
 						if species in output: #Library for all reads with the same ID, separated by species
 							output[species].append((totalM, line))
 						else:
-							output[species] = [(totalM, line)]
-					
+							output[species] = [(totalM, line)]				
