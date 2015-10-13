@@ -6,7 +6,6 @@ import sys
 import gzip
 import re
 import argparse
-import decision
 
 #####################
 ## Argument handeling
@@ -26,6 +25,49 @@ parser.add_argument('--Same_method', default = "pickTop", help='Method of keepin
 parser.add_argument('--Dif_method', default = "multimap", help='Method of keeping/excluding multimappers ( Same definitions as Same_method)')
 
 args = parser.parse_args()
+
+#####################
+## Define functions
+#####################
+# This function filters the reads based on the multimap option and decides whether or not to print
+def decision(output, RefSpecies, Same_method, Dif_method, maxLocs):
+	ToBePrinted = 0
+	for species in output:
+		if species == RefSpecies:
+			if re.match(Same_method ,'unique'):
+				if len(output[species]) == 1:
+					ToBePrinted += 1
+			elif re.match(Same_method ,'pickTop'):
+				if len(output[species]) < maxLocs:
+					if len(output[species]) > 1:
+						check_dup = [x[0][1] for x in output[species]]
+						if len(set(check_dup)) == 1: #Make sure length is greater than 1 and if IDs aren't duplicated in sam file
+							ToBePrinted += 1
+					elif len(output[species]) == 1: #If length is 1, this is basically unique option
+						ToBePrinted += 1
+			elif re.match(Same_method ,'duplicated'):
+				if len(output[species]) > 1:
+					ToBePrinted += 1
+			elif re.match(Same_method ,'multimap'):
+				ToBePrinted += 1
+		else:
+			if re.match(Dif_method ,'unique'):
+				if len(output[species]) == 1:
+					ToBePrinted += 1
+			elif re.match(Dif_method ,'pickTop'):
+				if len(output[species]) < maxLocs:
+					if len(output[species]) > 1:
+						check_dup = [x[0][1] for x in output[species]]
+						if len(set(check_dup)) == 1: #Make sure length is greater than 1 and if IDs aren't duplicated in sam file
+							ToBePrinted += 1
+					elif len(output[species]) == 1: #If length is 1, this is basically unique option
+						ToBePrinted += 1
+			elif re.match(Dif_method ,'duplicated'):
+				if len(output[species]) > 1:
+					ToBePrinted += 1
+			elif re.match(Dif_method ,'multimap'):
+				ToBePrinted += 1
+	return(ToBePrinted)
 
 #####################
 ## Initialize Variables
@@ -52,40 +94,41 @@ with open(args.outf,'w') as of:
 			if line.split()[0] !="@SQ": #Skip header info
 				line = line.rstrip('\n')
 				full = line.split()
-				current_id.append(full[0])
-#			if newid < current_id[0]: #Check if the file is sorted
-#				print "New Line: " + str(full[0]) + "\nOld Line: " + str(current_id[0])
-#				print "File is not sorted\n"
-#				sys.exit() #Only pass lines that are sorted
-			if full[0] != current_id[0]: #Change in ID leads to output of previous IDs sam lines
-				if len(output) >= 1: #Make sure output values are present as IDs with no passing reads can't be inputs to our function
-					(ToBePrinted) = decision.decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs)
-					if ToBePrinted == sumofspecies: #Testing if all the method qualifications are met
-						output_sorted = sorted(output[RefSpecies], reverse = True) #Sorted dictionary 
-						of.write(str(output_sorted[0][1] + "\t" + str(len(output_sorted)) + "\n")) #Choose the first read as this represents highest quality M value (pickTop accounted for with duplicates)	
-				current_id = [full[0]] #Reset all the variables for new ID
-				output = {}
-				mismatch = 0
-			species = full[-1] #Store species for future check
-			if re.search(species, speciesTocheck): #Only filter lines for species of interest
-				quality = full[5]
-				linelength = len(full[9])
-				if linelength > minbp: #Check minimum bp filter
-					char = [(i.start()) for i in list(re.finditer('[a-zA-Z]', quality))]
-					char.append(-1)
-					char = sorted(char)
-					m = [(i.start()) for i in list(re.finditer('M', quality))]
-					if(sum(char) > -1):
-						M = []
-						for j in range(0,len(char)-1):
-							if char[j+1] in m:
-								M.append(int(quality[char[j]+1:char[j+1]]))
-								totalM = sum(M) #Quality filter by accumulating all M values of particular read
-					if (species == SameSpecies and totalM > (linelength - mmSame)) or (species != SameSpecies and totalM > (linelength - mmDif)):
-						if species in output: #Library for all reads with the same ID, separated by species
-							if totalM == output[species][0][0]: #Reads with same quality will get appended for later filtering
-								output[species].append((totalM, line)) 
-							elif totalM > output[species][0][0]: #Reads with better quality will replace the current read with lower quality
-								output[species] = [(totalM, line)]		
-						else:
-							output[species] = [(totalM, line)] #Initializing the dictionary				
+				species = full[-1]
+				if re.search(species, speciesTocheck): #Only filter lines for species of interest
+					current_id.append(full[0])
+					newid = full[0]
+					if newid != current_id[0]: #Change in ID leads to output of previous IDs sam lines
+						if len(output) >= 1: #Make sure output values are present as IDs with no passing reads can't be inputs to our function
+							(ToBePrinted) = decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs)
+							if ToBePrinted == sumofspecies: #Testing if all the method qualifications are met
+								of.write(str(output[RefSpecies][0][1] + "\t" + str(len(output[RefSpecies])) + "\n")) #Choose the first read as this represents highest quality M value (pickTop accounted for with duplicates)	
+						current_id = [newid] #Reset all the variables for new ID
+						output = {}
+						mismatch = 0
+					quality = full[5]
+					linelength = len(full[9])
+					if linelength > minbp: #Check minimum bp filter
+						char = [(i.start()) for i in list(re.finditer('[a-zA-Z]', quality))]
+						char.append(-1)
+						char = sorted(char)
+						m = [(i.start()) for i in list(re.finditer('M', quality))]
+						if(sum(char) > -1):
+							M = []
+							for j in range(0,len(char)-1):
+								if char[j+1] in m:
+									M.append(int(quality[char[j]+1:char[j+1]]))
+									totalM = sum(M) #Quality filter by accumulating all M values of particular read
+						if (species == SameSpecies and totalM > (linelength - mmSame)) or (species != SameSpecies and totalM > (linelength - mmDif)):
+							start_pos = full[3]
+							if species in output: #Library for all reads with the same ID, separated by species
+								if totalM == output[species][0][0][0]: #Reads with same quality will get appended for later filtering
+									output[species].append(((totalM, start_pos), line))
+								elif totalM > output[species][0][0][0]: #Reads with better quality will replace the current read with lower quality
+									output[species] = [((totalM, start_pos), line)]	
+							else:
+								output[species] = [((totalM, start_pos), line)] #Initializing the dictionary
+			else:
+				(ToBePrinted) = decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs)
+				if ToBePrinted == sumofspecies: #Testing if all the method qualifications are met
+					of.write(str(output[RefSpecies][0][1] + "\t" + str(len(output[RefSpecies])) + "\n"))		
