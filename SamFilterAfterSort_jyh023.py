@@ -2,6 +2,8 @@
 #####################
 ## import libraries
 #####################
+
+
 import sys
 import gzip
 import re
@@ -12,8 +14,8 @@ import argparse
 #####################
 
 parser = argparse.ArgumentParser(description = "Filter sam files. Note: Input must be filtered on READ ID. Prior to sort, id must have a species tag added . (Also, get rid of the header)Example: sed \'s/$/ species/\' . Then concatenate and sort with cat file | sort -k1 ", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--f', default = None, help='Sorted file that will be filtered.  ')
-parser.add_argument('--outf', default = None, help='Output file')
+parser.add_argument('--f', default = "test.txt", help='Sorted file that will be filtered.  ')
+parser.add_argument('--outf', default = "out.txt", help='Output file')
 parser.add_argument('--RefSpecies', default = "hg19", help='Note: USE SAME SPELLING AS IN THE FILE . If aligned to more than one species this variable determines which species is used as the reference for final output. Options, f1, f2, or f3')
 parser.add_argument('--SameSpecies', default = "hg19", help = 'The species that the sample came from' )
 parser.add_argument('--SpeciesToCheck', default = "hg19", help='Comma delimited list of species. This allows you to merge all species into one file, and just check the ones you.re interested in. Ex: hg19,pantro4.')
@@ -90,7 +92,7 @@ mismatch = 0
 
 with open(args.outf,'w') as of:
 	with open(fh,'rb') as files:
-		for line in files.readlines():
+		for line in files:
 			if line.split()[0] !="@SQ": #Skip header info
 				line = line.rstrip('\n')
 				full = line.split()
@@ -132,3 +134,4 @@ with open(args.outf,'w') as of:
 				(ToBePrinted) = decision(output, RefSpecies ,Same_method ,Dif_method, maxLocs)
 				if ToBePrinted == sumofspecies: #Testing if all the method qualifications are met
 					of.write(str(output[RefSpecies][0][1] + "\t" + str(len(output[RefSpecies])) + "\n"))		
+
